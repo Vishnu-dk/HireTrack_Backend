@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static com.example.hiretrack.jooq.tables.Candidates.CANDIDATES;
@@ -30,23 +31,35 @@ public class InterviewRepository {
     }
 
     public boolean hasOverlap(Long interviewerId, Long excludeInterviewId, LocalDateTime newStart, LocalDateTime newEnd) {
-        Condition condition = INTERVIEWS.INTERVIEWER_ID.eq(interviewerId)
+        // Fetch only active interviews for this interviewer
+        List<com.example.hiretrack.jooq.tables.records.InterviewsRecord> existing = dsl.selectFrom(INTERVIEWS)
+                .where(INTERVIEWS.INTERVIEWER_ID.eq(interviewerId))
                 .and(INTERVIEWS.STATUS.ne(InterviewStatus.CANCELLED.name()))
-                .and(INTERVIEWS.SCHEDULED_AT.lt(newEnd))
-                .and(DSL.field("({0} + ({1} * interval '1 minute'))", LocalDateTime.class,
-                                INTERVIEWS.SCHEDULED_AT, INTERVIEWS.DURATION_MINUTES)
-                        .gt(newEnd));
+                .fetch();
 
-        if (excludeInterviewId != null) {
-            condition = condition.and(INTERVIEWS.ID.ne(excludeInterviewId));
+        for (var rec : existing) {
+            if (excludeInterviewId != null && rec.getId().equals(excludeInterviewId)) continue;
+
+            LocalDateTime existingStart = rec.getScheduledAt();
+            LocalDateTime existingEnd = existingStart.plusMinutes(rec.getDurationMinutes());
+
+            if (newStart.isBefore(existingEnd) && newEnd.isAfter(existingStart)) {
+                return true;
+            }
         }
+        return false;
+    }
 
+    public Long hasActiveInterview(Long candidateId) {
         return dsl.selectCount()
                 .from(INTERVIEWS)
-                        .where(condition)
-                .fetchOptional(0, Integer.class)
-                .map(count->count>0)
-                .orElse(false);
+                .where(INTERVIEWS.CANDIDATE_ID.eq(candidateId))
+                .and(INTERVIEWS.STATUS.in(
+                        InterviewStatus.SCHEDULED.name(),
+                        InterviewStatus.RESCHEDULED.name()
+                ))
+                .fetchOne(0, Long.class);
+
     }
 
 
@@ -81,6 +94,26 @@ public class InterviewRepository {
                         .where(INTERVIEWS.ID.eq(id))
                         .fetchOne(this::mapToResponse)
         );
+    }
+
+    public List<InterviewResponse> findByInterviewerId(Long interviewerId) {
+
+        Users users1 = USERS.as("USERS1");
+        Users users2 = USERS.as("USERS2");
+        return dsl.select(INTERVIEWS.asterisk(),
+                        users1.FULL_NAME.as("interviewer_name"),
+                        CANDIDATES.FULL_NAME.as("candidate_name"),
+                        JOB_OPENINGS.TITLE.as("job_title"),
+                        users2.FULL_NAME.as("created_by_name"))
+                .from(INTERVIEWS)
+                .join(users1).on(INTERVIEWS.INTERVIEWER_ID.eq(users1.ID))
+                .join(CANDIDATES).on(INTERVIEWS.CANDIDATE_ID.eq(CANDIDATES.ID))
+                .join(JOB_OPENINGS).on(INTERVIEWS.JOB_ID.eq(JOB_OPENINGS.ID))
+                .join(users2).on(INTERVIEWS.CREATED_BY.eq(users2.ID))
+                .where(INTERVIEWS.INTERVIEWER_ID.eq(interviewerId))
+                .and(INTERVIEWS.STATUS.ne(InterviewStatus.CANCELLED.name()))
+                .orderBy(INTERVIEWS.SCHEDULED_AT.asc())
+                .fetch(this::mapToResponse);
     }
 
 

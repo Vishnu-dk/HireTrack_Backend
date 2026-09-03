@@ -21,4 +21,9 @@ public class UserRepository {
                 dsl.selectFrom(USERS).where(USERS.EMAIL.equal(email)).fetchOne()
         );
     }
+    public Optional<UsersRecord> findById(Long id) {
+        return Optional.ofNullable(
+                dsl.selectFrom(USERS).where(USERS.ID.eq(id)).fetchOne()
+        );
+    }
 }
