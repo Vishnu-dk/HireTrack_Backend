@@ -33,6 +33,10 @@ public class JobService {
         UsersRecord user = userRepository.findbyEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+        if(jobRepository.findByTitleAndCreatedBy(request.getTitle(),user.getId()).isPresent()){
+            throw new BadRequestException("Job Already Created");
+        }
+
         JobOpeningsRecord record = jobRepository.create(
                 request.getTitle(), request.getDescription(), request.getDepartment(), user.getId());
 

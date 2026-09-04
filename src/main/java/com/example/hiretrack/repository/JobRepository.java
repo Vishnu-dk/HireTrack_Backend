@@ -14,6 +14,7 @@ import java.util.Optional;
 
 import static com.example.hiretrack.jooq.tables.JobOpenings.JOB_OPENINGS;
 import static com.example.hiretrack.jooq.tables.Users.USERS;
+import static org.jooq.impl.DSL.*;
 
 @Repository
 public class JobRepository {
@@ -37,6 +38,16 @@ public class JobRepository {
     public Optional<JobOpeningsRecord> findById(Long id) {
         return Optional.ofNullable(
                 dsl.selectFrom(JOB_OPENINGS).where(JOB_OPENINGS.ID.eq(id)).fetchOne()
+        );
+    }
+    public Optional<JobOpeningsRecord> findByTitleAndCreatedBy(String title ,Long createdById){
+        String conditionTitle = title == null ? "" : title.toLowerCase().replace(" ", "");
+
+        return Optional.ofNullable(
+                dsl.selectFrom(JOB_OPENINGS)
+                        .where(lower(replace(JOB_OPENINGS.TITLE, val(" "), val(""))).contains(conditionTitle))
+                        .and(JOB_OPENINGS.CREATED_BY.eq(createdById))
+                        .fetchAny()
         );
     }
 
