@@ -1,4 +1,4 @@
-# HireTrack Backend 🎯
+# HireTrack Backend 
 
 Enterprise recruitment platform built with **Spring Boot 3**, **jOOQ**, and **JWT Authentication**. Streamlines the hiring lifecycle with role-based access control, candidate pipeline management, interview scheduling with real-time conflict prevention, and structured feedback collection.
 
@@ -304,47 +304,6 @@ View:
 
 ---
 
-## 🎯 3-Minute Client Demo Flow
-
-### Recruiter
-
-1. Login as Recruiter
-2. Create a **Java Developer** job
-3. Add a candidate
-4. Upload candidate resume
-5. Shortlist candidate
-6. Schedule interview
-
-### System
-
-- Validates interviewer availability
-- Prevents scheduling conflicts
-
-### Interviewer
-
-1. Login
-2. View assigned interview
-3. Mark interview as completed
-4. Submit feedback
-
-Example:
-
-```text
-Recommendation: SELECT
-Technical Rating: 4/5
-```
-
-### Recruiter
-
-1. Review feedback
-2. Mark candidate as SELECTED
-3. Dashboard metrics update automatically
-
----
-
-## 💡 Elevator Pitch
-
-> "HireTrack provides a complete recruitment workflow with secure role-based access, interview conflict prevention, candidate pipeline management, structured feedback collection, and real-time hiring insights. Built using Spring Boot, PostgreSQL, jOOQ, Flyway, and JWT authentication for enterprise-ready deployment."
 
 ---
 
