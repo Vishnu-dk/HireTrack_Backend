@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -68,8 +70,14 @@ public class CandidateController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0")int page,
-            @RequestParam(defaultValue = "10") int size){
-        return ResponseEntity.ok(candidateService.getAllCandidates(jobId,status,search,page,size));
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserDetails user,
+            Authentication authentication){
+
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(role -> role.equals("ROLE_ADMIN") || role.equals("ADMIN"));
+        return ResponseEntity.ok(candidateService.getAllCandidates(jobId,status,search,page,size,isAdmin,user.getUsername()));
     }
 
     @PostMapping(value = "/{id}/resume" , consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

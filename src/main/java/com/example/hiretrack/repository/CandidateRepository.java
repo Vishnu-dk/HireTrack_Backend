@@ -92,6 +92,7 @@ public class CandidateRepository {
         dsl.update(CANDIDATES)
                 .set(CANDIDATES.STATUS,status.name())
                 .set(CANDIDATES.UPDATED_AT,LocalDateTime.now())
+                .where(CANDIDATES.ID.eq(id))
                 .execute();
     }
 
@@ -119,8 +120,8 @@ public class CandidateRepository {
         }
     }
 
-    public List<CandidateResponse> findAll(Long jobId, String status, String search, int page, int size) {
-        Condition condition = buildFilter(jobId, status, search);
+    public List<CandidateResponse> findAll(Long jobId, String status, String search, int page, int size,Boolean isAdmin, Long userId) {
+        Condition condition = buildFilter(jobId, status, search,isAdmin,userId);
 
         return dsl.select(CANDIDATES.asterisk(), USERS.FULL_NAME.as("added_by_name"), JOB_OPENINGS.TITLE.as("job_title"),
                         CANDIDATE_DOCUMENTS.FILE_NAME.as("resume_file_name"))
@@ -150,14 +151,14 @@ public class CandidateRepository {
                     return response;
                 });
     }
-    public Long count(Long jobId, String status, String search) {
+    public Long count(Long jobId, String status, String search,Boolean isAdmin,Long userId) {
         return dsl.selectCount()
                 .from(CANDIDATES)
-                .where(buildFilter(jobId, status, search))
+                .where(buildFilter(jobId, status, search,isAdmin,userId))
                 .fetchOneInto(Long.class);
     }
 
-    private Condition buildFilter(Long jobId, String status, String search) {
+    private Condition buildFilter(Long jobId, String status, String search,Boolean isAdmin,Long userId) {
         Condition condition = DSL.noCondition();
         if (jobId != null) {
             condition = condition.and(CANDIDATES.JOB_ID.eq(jobId));
@@ -169,6 +170,11 @@ public class CandidateRepository {
             condition = condition.and(
                     CANDIDATES.FULL_NAME.containsIgnoreCase(search)
                             .or(CANDIDATES.EMAIL.containsIgnoreCase(search))
+            );
+        }
+        if(!isAdmin){
+            condition=condition.and(
+                    CANDIDATES.ADDED_BY.eq(userId)
             );
         }
         return condition;

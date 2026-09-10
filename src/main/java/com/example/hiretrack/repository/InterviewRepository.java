@@ -1,6 +1,7 @@
 package com.example.hiretrack.repository;
 
 
+import com.example.hiretrack.dto.InterviewOverviewResponse;
 import com.example.hiretrack.dto.InterviewResponse;
 import com.example.hiretrack.enums.InterviewStatus;
 import com.example.hiretrack.jooq.tables.Users;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.example.hiretrack.jooq.tables.Candidates.CANDIDATES;
+import static com.example.hiretrack.jooq.tables.InterviewFeedback.INTERVIEW_FEEDBACK;
 import static com.example.hiretrack.jooq.tables.Interviews.INTERVIEWS;
 import static com.example.hiretrack.jooq.tables.JobOpenings.JOB_OPENINGS;
 import static com.example.hiretrack.jooq.tables.Users.USERS;
@@ -80,6 +82,7 @@ public class InterviewRepository {
     public Optional<InterviewResponse> findByIdWithDetails(Long id) {
         Users users1 = USERS.as("USERS1");
         Users users2 = USERS.as("USERS2");
+
         return Optional.ofNullable(
                 dsl.select(INTERVIEWS.asterisk(),
                                 users1.FULL_NAME.as("interviewer_name"),
@@ -87,14 +90,15 @@ public class InterviewRepository {
                                 JOB_OPENINGS.TITLE.as("job_title"),
                                 users2.FULL_NAME.as("created_by_name"))
                         .from(INTERVIEWS)
-                        .join(users1).on(INTERVIEWS.INTERVIEWER_ID.eq(users1.ID))
-                        .join(CANDIDATES).on(INTERVIEWS.CANDIDATE_ID.eq(CANDIDATES.ID))
-                        .join(JOB_OPENINGS).on(INTERVIEWS.JOB_ID.eq(JOB_OPENINGS.ID))
-                        .join(users2).on(INTERVIEWS.CREATED_BY.eq(users2.ID))
+                        .leftJoin(users1).on(INTERVIEWS.INTERVIEWER_ID.eq(users1.ID))      // 👈 Changed to leftJoin
+                        .leftJoin(CANDIDATES).on(INTERVIEWS.CANDIDATE_ID.eq(CANDIDATES.ID))  // 👈 Changed to leftJoin
+                        .leftJoin(JOB_OPENINGS).on(INTERVIEWS.JOB_ID.eq(JOB_OPENINGS.ID))   // 👈 Changed to leftJoin
+                        .leftJoin(users2).on(INTERVIEWS.CREATED_BY.eq(users2.ID))          // 👈 Changed to leftJoin
                         .where(INTERVIEWS.ID.eq(id))
                         .fetchOne(this::mapToResponse)
         );
     }
+
 
     public List<InterviewResponse> findByInterviewerId(Long interviewerId) {
 
@@ -127,17 +131,21 @@ public class InterviewRepository {
 
 
     public void updateSchedule(Long id,LocalDateTime newScheduleAt, int duration){
-        dsl.update(INTERVIEWS)
-                .set(INTERVIEWS.SCHEDULED_AT,newScheduleAt)
-                .set(INTERVIEWS.DURATION_MINUTES,duration)
-                .set(INTERVIEWS.UPDATED_AT,LocalDateTime.now())
+        int rowsUpdated = dsl.update(INTERVIEWS)
+                .set(INTERVIEWS.SCHEDULED_AT, newScheduleAt)
+                .set(INTERVIEWS.DURATION_MINUTES, duration)
+                .set(INTERVIEWS.UPDATED_AT, LocalDateTime.now())
+                .set(INTERVIEWS.STATUS,InterviewStatus.SCHEDULED.name())
                 .where(INTERVIEWS.ID.eq(id))
                 .execute();
+
+
     }
 
-    private  InterviewResponse mapToResponse(Record record) {
+    private InterviewResponse mapToResponse(Record record) {
+        if (record == null) return null;
 
-        InterviewResponse response=new InterviewResponse();
+        InterviewResponse response = new InterviewResponse();
         response.setId(record.get(INTERVIEWS.ID));
         response.setCandidateId(record.get(INTERVIEWS.CANDIDATE_ID));
         response.setCandidateName(record.get("candidate_name", String.class));
@@ -147,7 +155,20 @@ public class InterviewRepository {
         response.setInterviewerName(record.get("interviewer_name", String.class));
         response.setScheduledAt(record.get(INTERVIEWS.SCHEDULED_AT));
         response.setDurationMinutes(record.get(INTERVIEWS.DURATION_MINUTES));
-        response.setStatus(InterviewStatus.valueOf(record.get(INTERVIEWS.STATUS)));
+
+        // 💡 Safe Enum Value Extraction
+        String statusStr = record.get(INTERVIEWS.STATUS);
+        if (statusStr != null) {
+            try {
+                response.setStatus(InterviewStatus.valueOf(statusStr.trim().toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                System.err.println("[DEBUG] Unknown interview status value: " + statusStr);
+                response.setStatus(null);
+            }
+        } else {
+            response.setStatus(null);
+        }
+
         response.setCreatedById(record.get(INTERVIEWS.CREATED_BY));
         response.setCreatedByName(record.get("created_by_name", String.class));
         response.setCreatedAt(record.get(INTERVIEWS.CREATED_AT));
@@ -155,4 +176,115 @@ public class InterviewRepository {
 
         return response;
     }
+
+    public List<InterviewOverviewResponse> findAllInterview(
+            String status, String candidateName, String interviewerName, String jobTitle,
+            int page, int size, Boolean isAdmin,Long userId) {
+
+        Users interviewerTable = USERS.as("interviewerTable");
+        Users recruiterTable = USERS.as("recruiterTable");
+
+        Condition condition = buildAdminFilter(status, candidateName, interviewerName, jobTitle, interviewerTable,isAdmin,userId);
+
+        return dsl.select(
+                        INTERVIEWS.ID.as("interview_id"),
+                        INTERVIEWS.STATUS.as("interview_status"),
+                        INTERVIEWS.SCHEDULED_AT.as("scheduled_at"),
+                        INTERVIEWS.DURATION_MINUTES.as("duration_minutes"),
+                        CANDIDATES.FULL_NAME.as("candidate_name"),
+                        CANDIDATES.EMAIL.as("candidate_email"),
+                        recruiterTable.FULL_NAME.as("recruiter_name"),
+                        recruiterTable.EMAIL.as("recruiter_email"),
+                        interviewerTable.FULL_NAME.as("interviewer_name"),
+                        interviewerTable.EMAIL.as("interviewer_email"),
+                        JOB_OPENINGS.TITLE.as("job_title"),
+                        INTERVIEW_FEEDBACK.RECOMMENDATION.as("recommendation")
+                )
+                .from(INTERVIEWS)
+                .join(CANDIDATES).on(INTERVIEWS.CANDIDATE_ID.eq(CANDIDATES.ID))
+                .join(JOB_OPENINGS).on(INTERVIEWS.JOB_ID.eq(JOB_OPENINGS.ID))
+                .join(interviewerTable).on(INTERVIEWS.INTERVIEWER_ID.eq(interviewerTable.ID))
+                .join(recruiterTable).on(INTERVIEWS.CREATED_BY.eq(recruiterTable.ID))
+                .leftJoin(INTERVIEW_FEEDBACK).on(INTERVIEWS.ID.eq(INTERVIEW_FEEDBACK.INTERVIEW_ID))
+                .where(condition)
+                .orderBy(INTERVIEWS.SCHEDULED_AT.desc())
+                .limit(size)
+                .offset(page * size)
+                .fetch(record -> mapToOverviewResponse(record, isAdmin)); // 👈 Passed isAdmin here
+    }
+
+    public long countAdminOverview(String status, String candidateName, String interviewerName, String jobTitle,Boolean isAdmin,Long userId) {
+        Users interviewerTable = USERS.as("interviewerTable");
+        Users recruiterTable = USERS.as("recruiterTable");
+
+        Condition condition = buildAdminFilter(status, candidateName, interviewerName, jobTitle, interviewerTable,isAdmin,userId);
+
+        return dsl.selectCount()
+                .from(INTERVIEWS)
+                .join(CANDIDATES).on(INTERVIEWS.CANDIDATE_ID.eq(CANDIDATES.ID))
+                .join(JOB_OPENINGS).on(INTERVIEWS.JOB_ID.eq(JOB_OPENINGS.ID))
+                .join(interviewerTable).on(INTERVIEWS.INTERVIEWER_ID.eq(interviewerTable.ID))
+                .join(recruiterTable).on(INTERVIEWS.CREATED_BY.eq(recruiterTable.ID))
+                .leftJoin(INTERVIEW_FEEDBACK).on(INTERVIEWS.ID.eq(INTERVIEW_FEEDBACK.INTERVIEW_ID))
+                .where(condition)
+                .fetchOne(0, Long.class);
+    }
+
+    private Condition buildAdminFilter(String status, String candidateName, String interviewerName, String jobTitle, Users interviewerTable,Boolean isAdmin,Long userId) {
+        Condition condition = DSL.noCondition();
+
+        if (status != null && !status.trim().isEmpty()) {
+            condition = condition.and(INTERVIEWS.STATUS.eq(status.toUpperCase()));
+        }
+        if (candidateName != null && !candidateName.trim().isEmpty()) {
+            condition = condition.and(CANDIDATES.FULL_NAME.containsIgnoreCase(candidateName.trim()));
+        }
+        if (interviewerName != null && !interviewerName.trim().isEmpty()) {
+            condition = condition.and(interviewerTable.FULL_NAME.containsIgnoreCase(interviewerName.trim()));
+        }
+        if (jobTitle != null && !jobTitle.trim().isEmpty()) {
+            condition = condition.and(JOB_OPENINGS.TITLE.containsIgnoreCase(jobTitle.trim()));
+        }
+        if(!isAdmin){
+            condition=condition.and(
+                    INTERVIEWS.CREATED_BY.eq(userId)
+            );
+        }
+
+        return condition;
+    }
+
+    private InterviewOverviewResponse mapToOverviewResponse(Record record, boolean isAdmin) {
+        InterviewOverviewResponse item = new InterviewOverviewResponse();
+        item.setInterviewId(record.get("interview_id", Long.class));
+        item.setStatus(InterviewStatus.valueOf(record.get("interview_status", String.class)));
+        item.setScheduledAt(record.get("scheduled_at", LocalDateTime.class));
+        item.setDurationMinutes(record.get("duration_minutes", Integer.class));
+
+        item.setCandidateName(record.get("candidate_name", String.class));
+        item.setCandidateEmail(record.get("candidate_email", String.class));
+
+        if (isAdmin) {
+            item.setRecruiterName(record.get("recruiter_name", String.class));
+            item.setRecruiterEmail(record.get("recruiter_email", String.class));
+        } else {
+            item.setRecruiterName(null);
+            item.setRecruiterEmail(null);
+        }
+
+
+        item.setInterviewerName(record.get("interviewer_name", String.class));
+        item.setInterviewerEmail(record.get("interviewer_email", String.class));
+
+
+        item.setJob(record.get("job_title", String.class));
+
+        String recommendation = record.get("recommendation", String.class);
+        item.setFeedbackSubmitted(recommendation != null);
+        item.setFeedbackRecommendation(recommendation != null ? recommendation : "PENDING");
+
+        return item;
+    }
+
+
 }

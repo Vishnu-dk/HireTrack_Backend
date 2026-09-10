@@ -25,4 +25,6 @@ public class InterviewResponse {
     private String createdByName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Boolean feedbackSubmitted;
+
 }

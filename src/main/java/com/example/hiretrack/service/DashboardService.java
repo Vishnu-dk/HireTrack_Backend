@@ -28,14 +28,14 @@ public class DashboardService {
         stats.setRole(role);
 
         if ("ADMIN".equals(role) || "RECRUITER".equals(role)) {
-            stats.setTotalJobs(dashboardRepository.countJobsByStatus(null));
-            stats.setOpenJobs(dashboardRepository.countJobsByStatus("OPEN"));
-            stats.setCandidatesInPipeline(dashboardRepository.countCandidatesInPipeline());
-            stats.setInterviewsThisWeek(dashboardRepository.countInterviewsThisWeek());
-            stats.setPendingFeedback(dashboardRepository.countPendingFeedback());
+            stats.setTotalJobs(dashboardRepository.countJobsByStatus(null,user.getRole(),user.getId()));
+            stats.setOpenJobs(dashboardRepository.countJobsByStatus("OPEN",user.getRole(),user.getId()));
+            stats.setCandidatesInPipeline(dashboardRepository.countCandidatesInPipeline(user.getRole(),user.getId()));
+            stats.setInterviewsThisWeek(dashboardRepository.countInterviewsThisWeek(user.getRole(),user.getId()));
+            stats.setPendingFeedback(dashboardRepository.countPendingFeedback(user.getRole(),user.getId()));
         } else if ("INTERVIEWER".equals(role)) {
-            stats.setInterviewsThisWeek(dashboardRepository.countInterviewsThisWeek());
-            stats.setPendingFeedback(dashboardRepository.countPendingFeedback());
+            stats.setInterviewsThisWeek(dashboardRepository.countInterviewsThisWeek(user.getRole(),user.getId()));
+            stats.setPendingFeedback(dashboardRepository.countPendingFeedback(user.getRole(),user.getId()));
         }
 
         return stats;

@@ -77,30 +77,45 @@ public class CandidateService {
         return getCandidate(id);
     }
 
-    public CandidateResponse changeStatus(Long id,String newStatus){
-        CandidatesRecord candidate=getCandidateRecord(id);
-        CandidateStatus statusEnum;
+    public CandidateResponse changeStatus(Long id, String newStatus) {
+        CandidatesRecord candidate = getCandidateRecord(id);
 
-        try{
-            statusEnum=CandidateStatus.valueOf(newStatus);
+        CandidateStatus newStatusEnum;
+        try {
+            newStatusEnum = CandidateStatus.valueOf(newStatus);
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Invalid status. Allowed: APPLIED, SHORTLISTED, INTERVIEW_SCHEDULED, SELECTED, REJECTED");
         }
-
-        if (candidate.getStatus().equals(statusEnum.name())) {
-            throw new BadRequestException("Candidate is already " + statusEnum);
+        if(getCandidate(id).getResumeFileName()==null){
+            throw new BadRequestException("Resume should be updated to Shortlist candidate");
         }
-        if (FINAL_STATUSES.contains(CandidateStatus.valueOf(candidate.getStatus()))) {
+
+        CandidateStatus currentStatusEnum = CandidateStatus.valueOf(candidate.getStatus());
+
+        if (currentStatusEnum == newStatusEnum) {
+            throw new BadRequestException("Candidate is already " + newStatusEnum);
+        }
+
+        if (currentStatusEnum == CandidateStatus.SELECTED || currentStatusEnum == CandidateStatus.REJECTED) {
             throw new BadRequestException("Cannot change status of a candidate who is already SELECTED or REJECTED");
         }
-        candidateRepository.updateStatus(id, statusEnum);
-        return getCandidate(id);
 
+        if (newStatusEnum.getRank() < currentStatusEnum.getRank()) {
+            throw new BadRequestException("Invalid pipeline transition. Cannot revert status backward from "
+                    + currentStatusEnum + " to " + newStatusEnum);
+        }
+
+        candidateRepository.updateStatus(id, newStatusEnum);
+        return getCandidate(id);
     }
 
-    public PageResponse<CandidateResponse> getAllCandidates(Long jobId, String status, String search, int page, int size) {
-        List<CandidateResponse> content = candidateRepository.findAll(jobId, status, search, page, size);
-        long total = candidateRepository.count(jobId, status, search);
+
+    public PageResponse<CandidateResponse> getAllCandidates(Long jobId, String status, String search, int page, int size,Boolean isAdmin,String username) {
+
+        Long userId= userRepository.findbyEmail(username)
+                .orElseThrow(()->new ResourceNotFoundException("Invalid User")).getId();
+        List<CandidateResponse> content = candidateRepository.findAll(jobId, status, search, page, size,isAdmin,userId);
+        long total = candidateRepository.count(jobId, status, search,isAdmin,userId);
         int totalPages = (int) Math.ceil((double) total / size);
 
         PageResponse<CandidateResponse> pageResponse = new PageResponse<>();

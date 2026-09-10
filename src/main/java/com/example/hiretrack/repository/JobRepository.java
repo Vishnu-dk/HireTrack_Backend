@@ -91,8 +91,8 @@ public class JobRepository {
                 .execute();
     }
 
-    public List<JobResponseDto> findAll(String status, String search, int page, int size) {
-        Condition condition = buildFilter(status, search);
+    public List<JobResponseDto> findAll(String status, String search, int page, int size,Boolean isAdmin,Long userId) {
+        Condition condition = buildFilter(status, search,isAdmin,userId);
 
         return dsl.select(JOB_OPENINGS.asterisk(), USERS.FULL_NAME)
                 .from(JOB_OPENINGS)
@@ -116,14 +116,14 @@ public class JobRepository {
                 });
     }
 
-    public long count(String status, String search) {
+    public long count(String status, String search,Boolean isAdmin,Long userId) {
         return dsl.selectCount()
                 .from(JOB_OPENINGS)
-                .where(buildFilter(status, search))
+                .where(buildFilter(status, search,isAdmin,userId))
                 .fetchOne(0, long.class);
     }
 
-    private Condition buildFilter(String status, String search) {
+    private Condition buildFilter(String status, String search,Boolean isAdmin,Long userId) {
         Condition condition = DSL.noCondition();
 
         if (status != null && !status.isBlank()) {
@@ -133,6 +133,11 @@ public class JobRepository {
             condition = condition.and(
                     JOB_OPENINGS.TITLE.containsIgnoreCase(search)
                             .or(JOB_OPENINGS.DEPARTMENT.containsIgnoreCase(search))
+            );
+        }
+        if(!isAdmin){
+            condition=condition.and(
+                        JOB_OPENINGS.CREATED_BY.eq(userId)
             );
         }
         return condition;

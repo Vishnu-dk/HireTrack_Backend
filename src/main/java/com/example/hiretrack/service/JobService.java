@@ -85,9 +85,12 @@ public class JobService {
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found with id: " + id));
     }
 
-    public PageResponse<JobResponseDto> getAllJobs(String status, String search, int page, int size) {
-        List<JobResponseDto> content = jobRepository.findAll(status, search, page, size);
-        long total = jobRepository.count(status, search);
+    public PageResponse<JobResponseDto> getAllJobs(String status, String search, int page, int size,Boolean isAdmin,String username) {
+
+        Long userId= userRepository.findbyEmail(username)
+                .orElseThrow(()->new ResourceNotFoundException("Invalid User")).getId();
+        List<JobResponseDto> content = jobRepository.findAll(status, search, page, size,isAdmin,userId);
+        long total = jobRepository.count(status, search,isAdmin,userId);
         int totalPages = (int) Math.ceil((double) total / size);
 
         PageResponse<JobResponseDto> pageResponse = new PageResponse<>();

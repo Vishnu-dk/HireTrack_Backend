@@ -26,7 +26,13 @@ public class DataSeeder implements CommandLineRunner {
             dsl.insertInto(USERS, USERS.EMAIL, USERS.PASSWORD_HASH, USERS.FULL_NAME, USERS.ROLE)
                     .values("admin@test.com", hashedPassword, "Admin User", "ADMIN")
                     .values("recruiter@test.com", hashedPassword, "HR Recruiter", "RECRUITER")
+                    .values("recruiter1@test.com", hashedPassword, "HR Recruiter", "RECRUITER")
+                    .values("recruiter2@test.com", hashedPassword, "HR Recruiter", "RECRUITER")
+
                     .values("interviewer@test.com", hashedPassword, "Tech Interviewer", "INTERVIEWER")
+                    .values("interviewer1@test.com", hashedPassword, "Tech Interviewer", "INTERVIEWER")
+                    .values("interviewer2@test.com", hashedPassword, "Tech Interviewer", "INTERVIEWER")
+
                     .execute();
 
             System.out.println("🔥 Seeded 3 demo users (password: password123)");
