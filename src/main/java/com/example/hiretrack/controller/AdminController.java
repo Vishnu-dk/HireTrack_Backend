@@ -32,7 +32,7 @@ public class AdminController {
     }
 
     @GetMapping("/interviewers")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('RECRUITER')")
     public ResponseEntity<PageResponse<AdminResponse>> getAllInterviewers(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
